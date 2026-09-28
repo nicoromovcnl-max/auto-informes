@@ -1,0 +1,64 @@
+name: Reporte de venta diaria
+
+on:
+  schedule:
+    # 10:00 hora de Madrid. GitHub Actions usa UTC:
+    # Madrid es UTC+1 en invierno (CET) y UTC+2 en verano (CEST).
+    # Se programan ambos horarios (08:00 y 09:00 UTC) y el script decide
+    # si le corresponde correr según la hora local real de Madrid.
+    - cron: '0 8 * * *'
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  reporte:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Instalar navegador de Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Verificar hora local de Madrid (evita duplicar envíos)
+        id: check_time
+        run: |
+          MADRID_HOUR=$(TZ=Europe/Madrid date +%H)
+          echo "Hora actual en Madrid: $MADRID_HOUR"
+          if [ "$MADRID_HOUR" = "10" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generar y enviar reporte
+        if: steps.check_time.outputs.should_run == 'true'
+        env:
+          ONEBOX_LOGIN_URL: ${{ secrets.ONEBOX_LOGIN_URL }}
+          ONEBOX_DASHBOARD_URL: ${{ secrets.ONEBOX_DASHBOARD_URL }}
+          ONEBOX_USER: ${{ secrets.ONEBOX_USER }}
+          ONEBOX_PASS: ${{ secrets.ONEBOX_PASS }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: npm run report
+
+      - name: Subir screenshot como artefacto
+        if: steps.check_time.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-venta-diaria
+          path: screenshots/
+          retention-days: 30

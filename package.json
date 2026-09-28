@@ -1,0 +1,14 @@
+{
+  "name": "auto-informes",
+  "version": "1.0.0",
+  "description": "Reporte diario de ventas de Onebox (Superset) enviado automáticamente por email.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "report": "node src/send-report.js"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.14",
+    "playwright": "^1.47.0"
+  }
+}
